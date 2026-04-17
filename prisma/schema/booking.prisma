@@ -1,0 +1,30 @@
+model Booking {
+  id String @id @default(uuid())
+
+  studentId String
+  tutorId   String
+
+  student User @relation("studentBookings", fields: [studentId], references: [id])
+  tutor   User @relation("tutorBookings", fields: [tutorId], references: [id])
+
+  availabilityId String
+  availability   Availability @relation(fields: [availabilityId], references: [id])
+
+  startTime DateTime
+  endTime   DateTime
+  status BookingStatus @default(PENDING)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  review Review?
+
+  @@index([tutorId])
+  @@index([studentId])
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
