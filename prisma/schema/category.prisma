@@ -1,7 +1,13 @@
 model Categories {
-  id   String @id @default(uuid())
-  name String @unique
+  id       String   @id @default(uuid())
+  name     String   @unique
+
+  parentId String?
+  parent   Categories? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Categories[] @relation("CategoryHierarchy")
 
   tutors   TutorCategory[]
   students StudentCategory[]
+
+  @@unique([name, parentId])
 }

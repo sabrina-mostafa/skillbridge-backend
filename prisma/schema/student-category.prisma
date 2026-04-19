@@ -2,7 +2,7 @@ model StudentCategory {
   studentId String
   categoryId String
 
-  student  StudentProfile @relation(fields: [studentId], references: [id])
+  student  StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
   category Categories     @relation(fields: [categoryId], references: [id])
 
   @@id([studentId, categoryId])

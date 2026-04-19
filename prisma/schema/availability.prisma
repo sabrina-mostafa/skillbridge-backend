@@ -1,14 +1,14 @@
 model Availability {
-  id       String @id @default(uuid())
+  id String @id @default(uuid())
 
   tutorId String
-  tutor   TutorProfile @relation(fields: [tutorId], references: [id])
+  tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
 
   dayOfWeek Int
-  startTime DateTime
-  endTime   DateTime
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  startTime String
+  endTime   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   bookings Booking[]
 
