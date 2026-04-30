@@ -1,3 +1,4 @@
+import { env } from "../config/env";
 import { USER_ROLES } from "../constants/userRoles";
 import { prisma } from "../lib/prisma";
 
@@ -9,17 +10,17 @@ import { prisma } from "../lib/prisma";
 // so, to avoid that, we are making an API call to the sign-up endpoint to create only the admin user without creating Account, Session, VerificationToken entries manually
 
 
-async function seedAdmin() {
+export async function seedAdmin() {
     try {
         console.log("Seeding admin user...");
 
-        const AUTH_URL = process.env.BETTER_AUTH_URL;
+        const AUTH_URL = env.BETTER_AUTH_URL;
         if (!AUTH_URL) {
             throw new Error("BETTER_AUTH_URL is not defined in env");
         }
 
-        const adminEmail = process.env.ADMIN1_USER_EMAIL;
-        const adminPassword = process.env.ADMIN1_USER_PASSWORD;
+        const adminEmail = env.ADMIN1_USER_EMAIL;
+        const adminPassword = env.ADMIN1_USER_PASSWORD;
 
         if (!adminEmail || !adminPassword) {
             throw new Error("Admin email or password missing in env");
@@ -51,7 +52,7 @@ async function seedAdmin() {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Origin": process.env.APP_URL!
+                "Origin": env.APP_URL!
             },
             body: JSON.stringify(adminData1)
         });
@@ -83,4 +84,4 @@ async function seedAdmin() {
 }
 
 
-seedAdmin();
+// seedAdmin();
