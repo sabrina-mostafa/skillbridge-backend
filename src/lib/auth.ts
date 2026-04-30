@@ -2,16 +2,17 @@ import { betterAuth, User } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
 import nodemailer from "nodemailer";
+import { env } from "../config/env";
 
 // Create a transporter using SMTP
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false, // use STARTTLS (upgrade connection to TLS after connecting)
-    auth: {
-        user: process.env.APP_EMAIL,
-        pass: process.env.APP_PASS,
-    },
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false, // use STARTTLS (upgrade connection to TLS after connecting)
+  auth: {
+    user: env.APP_EMAIL,
+    pass: env.APP_PASS,
+  },
 });
 
 const emailVerificationTemplate = (user: User, verificationUrl: string) => `
@@ -102,52 +103,62 @@ const emailVerificationTemplate = (user: User, verificationUrl: string) => `
 
 
 export const auth = betterAuth({
-    database: prismaAdapter(prisma, {
-        provider: "postgresql", // or "mysql", "postgresql", ...etc
-    }),
-    trustedOrigins: [process.env.APP_URL!],
-    user: {
-        additionalFields: {
-            role: {
-                type: "string",
-                required: false,
-                defaultValue: "STUDENT",
-            },
-            status: {
-                type: "string",
-                required: false,
-                defaultValue: "ACTIVE",
-            },
-        }
-    },
-    emailAndPassword: {
-        enabled: true,
-        autoSignIn: false,
-        requireEmailVerification: true
-    },
-    emailVerification: {
-        sendOnSignUp: true, //sends email only when user registers/signup
-        sendVerificationEmail: async ({ user, url, token, }, request) => {
-            try {
-                console.log("******************* email sent")
-                console.log({ user, url, token });
+  database: prismaAdapter(prisma, {
+    provider: "postgresql", // or "mysql", "postgresql", ...etc
+  }),
+  trustedOrigins: [env.APP_URL!],
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "STUDENT",
+      },
+      status: {
+        type: "string",
+        required: false,
+        defaultValue: "ACTIVE",
+      },
+    }
+  },
+  emailAndPassword: {
+    enabled: true,
+    autoSignIn: false,
+    requireEmailVerification: true
+  },
+  emailVerification: {
+    sendOnSignUp: true, //sends email only when user registers/signup
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url, token, }, request) => {
+      try {
+        console.log("******************* email sent")
+        console.log({ user, url, token });
 
-                const verificationUrl = `${process.env.BETTER_AUTH_URL}/api/auth/verify-email?token=${token}`
+        const verificationUrl = `${env.BETTER_AUTH_URL}/api/auth/verify-email?token=${token}`
 
-                const info = await transporter.sendMail({
-                    from: '"Skill Bridge Team" <skillbridge@sk.com>', // sender address
-                    to: user.email, // list of recipients
-                    subject: "Please verify your email!", // subject line
-                    html: emailVerificationTemplate(user, verificationUrl), // HTML body
-                });
+        const info = await transporter.sendMail({
+          from: '"Skill Bridge Team" <skillbridge@sk.com>', // sender address
+          to: user.email, // list of recipients
+          subject: "Please verify your email!", // subject line
+          html: emailVerificationTemplate(user, verificationUrl), // HTML body
+        });
 
-                console.log("Message sent: %s", info.messageId);
-                // Preview URL is only available when using an Ethereal test account
-                console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-            } catch (err) {
-                console.error("Error while sending mail:", err);
-                throw err;
-            }
-        },
+        console.log("Message sent: %s", info.messageId);
+        // Preview URL is only available when using an Ethereal test account
+        console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+      } catch (err) {
+        console.error("Error while sending mail:", err);
+        throw err;
+      }
     },
+  },
+  socialProviders: {
+    google: {
+      clientId: env.GOOGLE_CLIENT_ID as string,
+      clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+
+      accessType: "offline",   //  for refresh token
+      prompt: "select_account consent",  // show the select google account prompt 
+    },
+  },
 });
