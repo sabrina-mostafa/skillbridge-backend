@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { auth as betterAuth } from "../lib/auth";
 import { UserRoles } from '../constants/userRoles';
 import { UserStatus } from '../constants/userStatus';
+import { Status } from '../../generated/prisma/enums';
 
 const auth = (...roles: UserRoles[]) => {
     return async (req: Request, res: Response, next: NextFunction) => {
@@ -41,6 +42,13 @@ const auth = (...roles: UserRoles[]) => {
                 return res.status(403).json({
                     success: false,
                     message: "You don't have permission to access this resource!"
+                });
+            }
+
+            // STATUS CHECK
+            if (req.user.status === Status.BLOCKED) {
+                return res.status(403).json({
+                    message: "Your account is BLOCKED. Contact admin.",
                 });
             }
             next();
