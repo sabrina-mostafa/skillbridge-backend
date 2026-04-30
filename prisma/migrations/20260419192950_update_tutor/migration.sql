@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "TutorProfile" ADD COLUMN     "avgRating" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "totalReviews" INTEGER NOT NULL DEFAULT 0;

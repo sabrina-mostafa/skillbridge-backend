@@ -15,12 +15,6 @@ model User {
     tutorProfile   TutorProfile?
     studentProfile StudentProfile?
 
-    bookingsAsStudent Booking[] @relation("studentBookings")
-    bookingsAsTutor   Booking[] @relation("tutorBookings")
-
-    studentReviews Review[] @relation("studentReviews")
-    tutorReviews   Review[] @relation("tutorReviews")
-
     @@unique([email])
     @@map("user")
 }

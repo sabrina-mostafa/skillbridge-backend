@@ -1,30 +1,43 @@
 model Booking {
   id String @id @default(uuid())
 
+  tutorId String
+  tutor   TutorProfile @relation("tutorBookings", fields: [tutorId], references: [id])
+
   studentId String
-  tutorId   String
+  student   StudentProfile @relation("studentBookings", fields: [studentId], references: [id])
 
-  student User @relation("studentBookings", fields: [studentId], references: [id])
-  tutor   User @relation("tutorBookings", fields: [tutorId], references: [id])
-
-  availabilityId String
-  availability   Availability @relation(fields: [availabilityId], references: [id])
-
+  date      DateTime
+  // derived range (for quick queries)
   startTime DateTime
   endTime   DateTime
-  status BookingStatus @default(PENDING)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
 
-  review Review?
+  status        BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+
+  meetingLink String?
+  meetingType String? // GOOGLE_MEET
+
+  review Review? @relation("BookingReview")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([tutorId])
   @@index([studentId])
+  @@index([tutorId, date])
 }
 
 enum BookingStatus {
   PENDING
   CONFIRMED
   COMPLETED
+  DECLINED
   CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
 }

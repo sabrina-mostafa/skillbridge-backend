@@ -4,13 +4,27 @@ model Availability {
   tutorId String
   tutor   TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
 
-  dayOfWeek Int
+  dayOfWeek DayOfWeek
+
+  // store ONLY time reference (UTC base date)
   startTime String
   endTime   String
+
+  slotDuration Int @default(30) // minutes (future-proof)
+  isActive Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  @@index([tutorId, dayOfWeek])
+}
 
-  bookings Booking[]
-
-  @@index([tutorId])
+enum DayOfWeek {
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
 }
