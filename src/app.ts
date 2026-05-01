@@ -11,6 +11,7 @@ import { BookingRoutes } from "./modules/booking/booking.routes";
 import { AdminRoutes } from "./modules/admin/admin.routes";
 import { globalErrorHandler } from "./errors/globalErrorHandler";
 import { env } from "./config/env";
+import { notFound } from "./middlewares/notFound";
 
 const app: Application = express();
 
@@ -53,6 +54,9 @@ app.get('/', (req, res) => {
   res.send('Hello from Sabrina ^.^')
 });
 
+
+// 404 handler
+app.use(notFound);
 
 // Error handler
 app.use(globalErrorHandler);
