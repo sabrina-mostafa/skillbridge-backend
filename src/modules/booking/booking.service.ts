@@ -1,4 +1,5 @@
 import { BookingStatus } from "../../../generated/prisma/enums";
+import { SESSION_STATUS } from "../../constants/sessionStatus";
 import { USER_ROLES, UserRoles } from "../../constants/userRoles";
 import { AppError } from "../../errors/AppError";
 import paginationSorting from "../../helpers/paginationSorting.helper";
@@ -17,6 +18,7 @@ const createBooking = async (
     userId: string,
     payload: {
         tutorId: string;
+        categoryId: string;
         date: Date;
         startTime: Date;
         endTime: Date;
@@ -44,7 +46,7 @@ const createBooking = async (
     }
 
     // independent queries in parallel
-    const [user, tutor, student] = await Promise.all([
+    const [user, tutor, student, category] = await Promise.all([
         prisma.user.findUnique({
             where: { id: userId },
             select: { role: true },
@@ -57,6 +59,10 @@ const createBooking = async (
             where: { userId },
             select: { id: true },
         }),
+        prisma.categories.findUnique({
+            where: { id: payload.categoryId },
+            select: { id: true },
+        }),
     ]);
 
     if (!user) throw new AppError(404, "User not found!");
@@ -66,6 +72,7 @@ const createBooking = async (
 
     if (!tutor) throw new AppError(404, "Tutor not found!");
     if (!student) throw new AppError(404, "Student not found!");
+    if (!category) throw new AppError(404, "Category not found!");
 
     // overlapping bookings
     const overlap = await prisma.booking.findFirst({
@@ -96,12 +103,12 @@ const createBooking = async (
         data: {
             tutorId: payload.tutorId,
             studentId: student.id,
+            categoryId: payload.categoryId,
             date: payload.startTime,
             startTime: payload.startTime,
             endTime: payload.endTime,
         },
     });
-    console.log("booking:", bookings);
     return bookings;
 };
 
@@ -195,6 +202,7 @@ const getAllBookings = async (role: UserRoles, query: GetAllBookingsQuery) => {
                             select: {
                                 name: true,
                                 email: true,
+                                image: true,
                             },
                         },
                     },
@@ -205,10 +213,18 @@ const getAllBookings = async (role: UserRoles, query: GetAllBookingsQuery) => {
                             select: {
                                 name: true,
                                 email: true,
+                                image: true,
                             },
                         },
                     },
                 },
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    }
+                },
+                review: true
             },
             take: limit,
             skip,
@@ -247,7 +263,14 @@ const getMyBookings = async (userId: string, query: GetMyBookingsQuery) => {
     const { page, limit, skip, sortBy, sortOrder } =
         paginationSorting(query);
 
-    const allowedSortFields = ["createdAt", "date", "status"];
+    const allowedSortFields = [
+        "createdAt",
+        "date",
+        "status",
+        "startTime",
+        "endTime",
+        "meetingType",
+    ];
     const safeSortBy = allowedSortFields.includes(sortBy)
         ? sortBy
         : "createdAt";
@@ -257,6 +280,10 @@ const getMyBookings = async (userId: string, query: GetMyBookingsQuery) => {
             Object.values(BookingStatus).includes(query.status as BookingStatus)
             ? (query.status as BookingStatus)
             : undefined;
+
+    const meetingType = query.meetingType;
+    const sessionStatus = query.sessionStatus?.toUpperCase();
+    const now = new Date();
 
     // 3. Base WHERE condition
     let whereCondition: any = {};
@@ -287,6 +314,46 @@ const getMyBookings = async (userId: string, query: GetMyBookingsQuery) => {
     // 5. Optional filters
     if (status) {
         whereCondition.status = status;
+    }
+
+    if (meetingType) {
+        whereCondition.meetingType = meetingType;
+    }
+
+    if (sessionStatus) {
+        switch (sessionStatus) {
+            case SESSION_STATUS.UPCOMING:
+                whereCondition.status = BookingStatus.CONFIRMED;
+                whereCondition.startTime = {
+                    gt: now,
+                };
+                break;
+
+            case SESSION_STATUS.ONGOING:
+                whereCondition.status = BookingStatus.CONFIRMED;
+                whereCondition.startTime = {
+                    lte: now,
+                };
+                whereCondition.endTime = {
+                    gte: now,
+                };
+                break;
+
+            case SESSION_STATUS.COMPLETED:
+                whereCondition.status = BookingStatus.COMPLETED;
+                break;
+
+            case SESSION_STATUS.MISSED:
+                whereCondition.status = BookingStatus.CONFIRMED;
+                whereCondition.endTime = {
+                    lt: now,
+                };
+                break;
+
+            case SESSION_STATUS.CANCELLED:
+                whereCondition.status = BookingStatus.CANCELLED;
+                break;
+        }
     }
 
     if (query.startDate || query.endDate) {
@@ -327,6 +394,13 @@ const getMyBookings = async (userId: string, query: GetMyBookingsQuery) => {
                         },
                     },
                 },
+                category: {
+                    select: {
+                        id: true,
+                        name: true,
+                    }
+                },
+                review: true
             },
             take: limit,
             skip,
@@ -361,6 +435,13 @@ const getBookingByBookingId = async (bookingId: string) => {
         include: {
             tutor: true,
             student: true,
+            category: {
+                select: {
+                    id: true,
+                    name: true,
+                }
+            },
+            review: true
         },
     });
 
