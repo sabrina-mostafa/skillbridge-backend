@@ -1,0 +1,11 @@
+model Conversation {
+    id String @id @default(uuid())
+
+    lastMessageAt DateTime?
+
+    messages     Message[]
+    participants ConversationParticipant[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}

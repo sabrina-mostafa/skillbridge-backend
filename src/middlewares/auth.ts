@@ -29,8 +29,10 @@ const auth = (...roles: UserRoles[]) => {
                 name: session.user.name,
                 email: session.user.email,
                 emailVerified: session.user.emailVerified,
+                image: session.user.image as string,
                 role: session.user.role as UserRoles,
-                status: session.user.status as UserStatus
+                status: session.user.status as UserStatus,
+                profileCompleted: session.user.profileCompleted as boolean,
             };
 
             if (roles.length && !roles.includes(req.user.role)) {

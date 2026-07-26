@@ -1,0 +1,15 @@
+model ContactMessage {
+  id          String   @id @default(uuid())
+
+  fullName    String
+  email       String
+  phone       String?
+
+  userType    String
+
+  inquiryType String[]
+
+  message     String
+
+  createdAt   DateTime @default(now())
+}
