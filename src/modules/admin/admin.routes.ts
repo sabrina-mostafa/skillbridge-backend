@@ -14,5 +14,32 @@ router.get("/platform", auth(USER_ROLES.ADMIN), AdminController.getPlatformAnaly
 
 router.patch("/:userId/status", auth(USER_ROLES.ADMIN), AdminController.updateUserStatus);
 
+router.patch(
+    "/tutors/:tutorId/featured",
+    auth(USER_ROLES.ADMIN),
+    AdminController.updateTutorFeatured
+);
+
+// Public route (form)
+router.post("/contact", AdminController.createContactMessage);
+
+// Admin route
+router.get("/contact", auth(USER_ROLES.ADMIN), AdminController.getAllMessages);
+
+// delete contact message
+router.delete("/contact/:messageId", auth(USER_ROLES.ADMIN), AdminController.deleteMessage);
+
+router.get(
+    "/reports",
+    auth(USER_ROLES.ADMIN),
+    AdminController.getReports
+);
+
+router.get(
+    "/reports/:type",
+    auth(USER_ROLES.ADMIN),
+    AdminController.generateReport
+);
+
 
 export const AdminRoutes = router;
