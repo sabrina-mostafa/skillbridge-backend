@@ -72,7 +72,8 @@ export async function seedAdmin() {
                 email: adminData1.email
             },
             data: {
-                emailVerified: true
+                emailVerified: true,
+                profileCompleted: true,
             }
         });
         console.log("Admin email verified");
