@@ -12,6 +12,9 @@ import { AdminRoutes } from "./modules/admin/admin.routes";
 import { globalErrorHandler } from "./errors/globalErrorHandler";
 import { env } from "./config/env";
 import { notFound } from "./middlewares/notFound";
+import { UserRoutes } from "./modules/users/user.routes";
+import { ConversationRoutes } from "./modules/conversation/conversation.routes";
+import { MessageRoutes } from "./modules/message/message.routes";
 
 const app: Application = express();
 
@@ -29,7 +32,10 @@ app.all('/api/auth/{*any}', toNodeHandler(auth));
 
 
 // Admin
-app.use("/users", AdminRoutes);
+app.use("/admin", AdminRoutes);
+
+// Users
+app.use("/users", UserRoutes);
 
 // Tutor Profiles
 app.use("/tutors", TutorRoutes);
@@ -48,6 +54,13 @@ app.use("/booking", BookingRoutes);
 
 // Reviews
 app.use("/review", ReviewRoutes);
+
+// Conversation
+app.use("/conversation", ConversationRoutes);
+
+// Message
+app.use("/message", MessageRoutes);
+
 
 // test
 app.get('/', (req, res) => {
