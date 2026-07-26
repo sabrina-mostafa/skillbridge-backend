@@ -1,6 +1,7 @@
+import { Prisma } from "../../../generated/prisma/browser";
 import { User } from "../../../generated/prisma/client";
 import { BookingStatus } from "../../../generated/prisma/enums";
-import { USER_ROLES } from "../../constants/userRoles";
+import { USER_ROLES, UserRoles } from "../../constants/userRoles";
 import { AppError } from "../../errors/AppError";
 import paginationSorting from "../../helpers/paginationSorting.helper";
 import { prisma } from "../../lib/prisma";
@@ -65,7 +66,7 @@ const createReview = async (userId: string, data: CreateReviewPayload) => {
             where: { id: booking.tutorId },
             data: {
                 totalReviews: newTotal,
-                avgRating: parseFloat(newAvg.toFixed(2)),
+                avgRating: newAvg,
             },
         });
 
@@ -175,6 +176,26 @@ const getReviewByTutorId = async (
                         },
                     },
                 },
+                tutor: {
+                    select: {
+                        education: true,
+                        user: {
+                            select: {
+                                name: true,
+                                image: true,
+                            },
+                        }
+                    }
+                },
+                booking: {
+                    select: {
+                        category: {
+                            select: {
+                                name: true,
+                            }
+                        }
+                    }
+                }
             },
             take: limit,
             skip,
@@ -208,6 +229,257 @@ const getReviewByTutorId = async (
             total,
             totalPages: Math.ceil(total / limit),
         },
+        data: reviews,
+    };
+};
+
+const getMyReviews = async (
+    userId: string,
+    role: UserRoles,
+    query: GetReviewQuery
+) => {
+    const { page, limit, skip, sortBy, sortOrder } =
+        paginationSorting(query);
+
+    const allowedSortFields = ["createdAt", "rating"];
+
+    const safeSortBy = allowedSortFields.includes(sortBy)
+        ? sortBy
+        : "createdAt";
+
+    const minRating = query.minRating
+        ? Number(query.minRating)
+        : undefined;
+
+    let whereCondition: Prisma.ReviewWhereInput = {};
+
+    if (role === USER_ROLES.STUDENT) {
+        const student = await prisma.studentProfile.findUnique({
+            where: {
+                userId,
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        if (!student) {
+            throw new AppError(404, "Student profile not found");
+        }
+
+        whereCondition.studentId = student.id;
+    }
+
+    if (role === USER_ROLES.TUTOR) {
+        const tutor = await prisma.tutorProfile.findUnique({
+            where: {
+                userId,
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        if (!tutor) {
+            throw new AppError(404, "Tutor profile not found");
+        }
+
+        whereCondition.tutorId = tutor.id;
+    }
+
+    if (minRating !== undefined) {
+        whereCondition.rating = {
+            gte: minRating,
+        };
+    }
+
+    const [reviews, total] = await Promise.all([
+        prisma.review.findMany({
+            where: whereCondition,
+
+            include: {
+                tutor: {
+                    select: {
+                        education: true,
+                        avgRating: true,
+                        totalReviews: true,
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                                image: true,
+                            },
+                        },
+                    },
+                },
+
+                student: {
+                    select: {
+                        education: true,
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                                image: true,
+                            },
+                        },
+                    },
+                },
+
+                booking: {
+                    include: {
+                        category: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+
+            skip,
+            take: limit,
+
+            orderBy: {
+                [safeSortBy]: sortOrder,
+            },
+        }),
+
+        prisma.review.count({
+            where: whereCondition,
+        }),
+    ]);
+
+    return {
+        meta: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+        },
+        data: reviews,
+    };
+};
+
+const getAllReviews = async (
+    query: GetReviewQuery
+) => {
+    const {
+        page,
+        limit,
+        skip,
+        sortBy,
+        sortOrder,
+    } = paginationSorting(query);
+
+    const allowedSortFields = [
+        "createdAt",
+        "rating",
+    ];
+
+    const safeSortBy =
+        allowedSortFields.includes(sortBy)
+            ? sortBy
+            : "createdAt";
+
+    const minRating = query.minRating
+        ? Number(query.minRating)
+        : undefined;
+
+    const searchTerm = query.searchTerm?.trim();
+
+    const where: Prisma.ReviewWhereInput = {
+        ...(minRating && {
+            rating: {
+                gte: minRating,
+            },
+        }),
+
+        ...(searchTerm && {
+            OR: [
+                {
+                    student: {
+                        user: {
+                            name: {
+                                contains: searchTerm,
+                                mode: "insensitive",
+                            },
+                        },
+                    },
+                },
+                {
+                    tutor: {
+                        user: {
+                            name: {
+                                contains: searchTerm,
+                                mode: "insensitive",
+                            },
+                        },
+                    },
+                },
+                {
+                    booking: {
+                        category: {
+                            name: {
+                                contains: searchTerm,
+                                mode: "insensitive",
+                            },
+                        },
+                    },
+                },
+            ],
+        }),
+    };
+
+    const [reviews, total] =
+        await Promise.all([
+            prisma.review.findMany({
+                where,
+
+                include: {
+                    student: {
+                        include: {
+                            user: true,
+                        },
+                    },
+
+                    tutor: {
+                        include: {
+                            user: true,
+                        },
+                    },
+
+                    booking: {
+                        include: {
+                            category: true,
+                        },
+                    },
+                },
+
+                skip,
+                take: limit,
+
+                orderBy: {
+                    [safeSortBy]: sortOrder,
+                },
+            }),
+
+            prisma.review.count({
+                where,
+            }),
+        ]);
+
+    return {
+        meta: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(
+                total / limit
+            ),
+        },
+
         data: reviews,
     };
 };
@@ -266,5 +538,7 @@ export const reviewService = {
     createReview,
     updateReview,
     getReviewByTutorId,
+    getMyReviews,
+    getAllReviews,
     deleteReview,
 }

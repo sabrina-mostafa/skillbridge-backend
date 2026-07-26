@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { reviewService } from "./review.service";
 import { User } from "../../../generated/prisma/client";
+import { UserRoles } from "../../constants/userRoles";
 
 
 const createReview = async (req: Request, res: Response, next: NextFunction) => {
@@ -55,6 +56,50 @@ const getReviewByTutorId = async (req: Request, res: Response, next: NextFunctio
     }
 };
 
+const getMyReviews = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const userId = req.user?.id as string;
+        const role = req.user?.role as UserRoles;
+
+        const result = await reviewService.getMyReviews(
+            userId,
+            role,
+            req.query
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Reviews fetched successfully",
+            data: result,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getAllReviews = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const result =
+            await reviewService.getAllReviews(req.query);
+
+        res.status(200).json({
+            success: true,
+            message: "Reviews fetched successfully",
+            data: result,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const deleteReview = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { reviewId } = req.params;
@@ -76,5 +121,7 @@ export const reviewController = {
     createReview,
     updateReview,
     getReviewByTutorId,
+    getMyReviews,
+    getAllReviews,
     deleteReview,
 }

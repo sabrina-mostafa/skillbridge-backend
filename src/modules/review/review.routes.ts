@@ -6,6 +6,10 @@ import { USER_ROLES } from "../../constants/userRoles";
 const router: Router = Router();
 
 
+router.get("/", auth(USER_ROLES.ADMIN), reviewController.getAllReviews);
+
+router.get("/my-reviews", auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR), reviewController.getMyReviews);
+
 router.get("/:tutorId", auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.ADMIN), reviewController.getReviewByTutorId);
 
 router.post("/", auth(USER_ROLES.STUDENT), reviewController.createReview);

@@ -10,10 +10,11 @@ export type UpdateReviewPayload = {
 }
 
 export type GetReviewQuery = {
-  minRating?: string;
-  page?: string;
-  limit?: string;
-  skip?: string;
-  sortBy?: string;
-  sortOrder?: string;
+    searchTerm?: string;
+    minRating?: string;
+    page?: string;
+    limit?: string;
+    skip?: string;
+    sortBy?: string;
+    sortOrder?: string;
 }
