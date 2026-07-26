@@ -4,7 +4,7 @@ model StudentProfile {
   education String? @db.VarChar(225)
 
   userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   bookingsAsStudent Booking[] @relation("studentBookings")
   studentReviews    Review[]  @relation("studentReviews")

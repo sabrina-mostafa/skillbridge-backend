@@ -245,7 +245,27 @@ const createStudentProfile = async (payload: CreateStudentPayload, userId: strin
                 skipDuplicates: true,
             });
         }
-        return studentProfile;
+
+        // marking profile creation as complete
+        await tx.user.update({
+            where: { id: userId },
+            data: {
+                profileCompleted: true,
+            },
+        });
+
+        return tx.studentProfile.findUnique({
+            where: {
+                id: studentProfile.id,
+            },
+            include: {
+                categories: {
+                    select: {
+                        category: true,
+                    },
+                },
+            },
+        });;
     });
     return result;
 };

@@ -7,6 +7,9 @@ model Booking {
   studentId String
   student   StudentProfile @relation("studentBookings", fields: [studentId], references: [id])
 
+  categoryId String
+  category   Categories @relation(fields: [categoryId], references: [id])
+
   date      DateTime
   // derived range (for quick queries)
   startTime DateTime
@@ -18,7 +21,7 @@ model Booking {
   meetingLink String?
   meetingType String? // GOOGLE_MEET
 
-  review Review? @relation("BookingReview")
+  review       Review?       @relation("BookingReview")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

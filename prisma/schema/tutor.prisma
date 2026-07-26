@@ -1,6 +1,7 @@
 model TutorProfile {
   id           String  @id @default(uuid())
   bio          String? @db.Text
+  education    String? @db.VarChar(225)
   experience   String  @db.VarChar(225)
   hourlyRate   Decimal @db.Decimal(10, 2)
   isFeatured   Boolean @default(false)
@@ -8,7 +9,7 @@ model TutorProfile {
   totalReviews Int     @default(0)
 
   userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   bookingsAsTutor Booking[] @relation("tutorBookings")
   tutorReviews    Review[]  @relation("tutorReviews")
