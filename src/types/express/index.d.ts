@@ -10,8 +10,10 @@ declare global {
                 name: string;
                 email: string;
                 emailVerified: boolean;
+                image: string;
                 role: UserRoles;
                 status: UserStatus;
+                profileCompleted: boolean;
             };
         }
     }

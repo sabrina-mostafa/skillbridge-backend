@@ -13,16 +13,20 @@ export const generateTimeSlots = (
   // are the exact numbers stored in the Date object.
   let current = new Date(date);
   current.setUTCHours(startH!, startM!, 0, 0);
+  // current.setHours(startH!, startM!, 0, 0);
 
   const endTime = new Date(date);
   endTime.setUTCHours(endH!, endM!, 0, 0);
+  // endTime.setHours(endH!, endM!, 0, 0);
+
 
   while (current < endTime) {
     const slotStart = new Date(current);
     const slotEnd = new Date(current);
 
     // Use getUTCMinutes/setUTCMinutes to avoid local offset shifts
-    slotEnd.setUTCMinutes(slotEnd.getUTCMinutes() + duration);
+    // slotEnd.setUTCMinutes(slotEnd.getUTCMinutes() + duration);
+    slotEnd.setMinutes(slotEnd.getMinutes() + duration);
 
     if (slotEnd <= endTime) {
       slots.push({
@@ -31,7 +35,8 @@ export const generateTimeSlots = (
       });
     }
 
-    current.setUTCMinutes(current.getUTCMinutes() + duration);
+    // current.setUTCMinutes(current.getUTCMinutes() + duration);
+    current.setMinutes(current.getMinutes() + duration);
   }
 
   return slots;
