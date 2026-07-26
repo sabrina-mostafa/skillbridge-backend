@@ -8,6 +8,8 @@ const router: Router = Router();
 
 router.get("/", CategoryController.getAllCategories);
 
+router.get("/:categoryId", CategoryController.getCategoryById);
+
 router.post("/", auth(USER_ROLES.ADMIN), CategoryController.createCategory);
 
 router.patch("/:categoryId", auth(USER_ROLES.ADMIN), CategoryController.updateCategory);
