@@ -18,6 +18,29 @@ const getAllTutorProfiles = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
+const getMyStudents = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user?.id as string;
+
+    const students = await TutorService.getMyStudents(
+      userId,
+      req.query
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Students fetched successfully",
+      data: students,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getMyTutorProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
 
@@ -136,6 +159,7 @@ const deleteTutorProfile = async (req: Request, res: Response, next: NextFunctio
 
 export const TutorController = {
   getAllTutorProfiles,
+  getMyStudents,
   getMyTutorProfile,
   getTutorProfileById,
   getAvailableDates,

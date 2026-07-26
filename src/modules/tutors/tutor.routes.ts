@@ -11,6 +11,8 @@ router.get('/', TutorController.getAllTutorProfiles);
 
 router.get('/me', auth(USER_ROLES.TUTOR), TutorController.getMyTutorProfile);
 
+router.get("/my-students", auth(USER_ROLES.TUTOR), TutorController.getMyStudents);
+
 router.get('/:tutorId', TutorController.getTutorProfileById);
 
 router.get('/:tutorId/available-dates', auth(USER_ROLES.ADMIN, USER_ROLES.STUDENT, USER_ROLES.TUTOR), TutorController.getAvailableDates);

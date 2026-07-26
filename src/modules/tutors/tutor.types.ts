@@ -2,15 +2,17 @@ import { DayOfWeek } from "../../../generated/prisma/enums";
 
 export type CreateTutorPayload = {
   bio?: string;
+  education: string;
   experience: string;
   hourlyRate: number;
-  isFeatured?: boolean;
+  // isFeatured?: boolean;
   categories?: string[];
   availability?: string[];
 };
 
 export type GetTutorsQuery = {
   searchTerm?: string;   // subject/category name
+  course?: string;
   minPrice?: string;
   maxPrice?: string;
   minRating?: string;
@@ -21,6 +23,14 @@ export type GetTutorsQuery = {
   sortBy?: string;
   sortOrder?: string;
 }
+
+export type GetStudentsQuery = {
+    searchTerm?: string;
+    page?: string;
+    limit?: string;
+    sortBy?: string;
+    sortOrder?: string;
+};
 
 export const dayMap: Record<number, DayOfWeek> = {
   0: "SUNDAY",

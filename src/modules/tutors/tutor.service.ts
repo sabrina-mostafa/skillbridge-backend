@@ -2,18 +2,23 @@ import { USER_ROLES } from "../../constants/userRoles";
 import { convertStrToNum } from "../../utils/convertStrToNum.utils";
 import paginationSorting from "../../helpers/paginationSorting.helper";
 import { prisma } from "../../lib/prisma";
-import { CreateTutorPayload, dayMap, GetTutorsQuery } from "./tutor.types";
+import { CreateTutorPayload, dayMap, GetStudentsQuery, GetTutorsQuery } from "./tutor.types";
 import { generateTimeSlots } from "../../helpers/generateTimeSlots";
 import { BookingStatus, DayOfWeek } from "../../../generated/prisma/enums";
 import { AppError } from "../../errors/AppError";
+import { AVAILABILITY_STATUS, AvailabilityStatus } from "../../constants/availabilityStatus";
 
 
 
 const getAllTutorProfiles = async (query: GetTutorsQuery) => {
+
+    console.log("REQ QUERY:", query);
+
     // 1. Convert query params safely
     const minRating = convertStrToNum(query.minRating, "minRating");
     const minPrice = convertStrToNum(query.minPrice, "minPrice");
     const maxPrice = convertStrToNum(query.maxPrice, "maxPrice");
+    const subjectId = query.course?.trim();
 
     // 2. Pagination + sorting
     const { page, limit, skip, sortBy, sortOrder } =
@@ -38,6 +43,14 @@ const getAllTutorProfiles = async (query: GetTutorsQuery) => {
             isFeatured: query.isFeatured === "true",
         }),
 
+        ...(subjectId && {
+            categories: {
+                some: {
+                    categoryId: subjectId,
+                },
+            },
+        }),
+
         ...(minPrice !== undefined || maxPrice !== undefined
             ? {
                 hourlyRate: {
@@ -48,10 +61,21 @@ const getAllTutorProfiles = async (query: GetTutorsQuery) => {
             : {}),
 
         ...(searchTerm && {
-            categories: {
-                some: {
-                    OR: [
-                        {
+            OR: [
+                // 1. Search by tutor name (NEW)
+                {
+                    user: {
+                        name: {
+                            contains: searchTerm,
+                            mode: "insensitive",
+                        },
+                    },
+                },
+
+                // 2. Search by category / subject
+                {
+                    categories: {
+                        some: {
                             category: {
                                 name: {
                                     contains: searchTerm,
@@ -59,7 +83,13 @@ const getAllTutorProfiles = async (query: GetTutorsQuery) => {
                                 },
                             },
                         },
-                        {
+                    },
+                },
+
+                // 3. Search by parent category
+                {
+                    categories: {
+                        some: {
                             category: {
                                 parent: {
                                     name: {
@@ -69,9 +99,9 @@ const getAllTutorProfiles = async (query: GetTutorsQuery) => {
                                 },
                             },
                         },
-                    ],
+                    },
                 },
-            },
+            ],
         }),
 
         ...(minRating !== undefined && {
@@ -128,6 +158,133 @@ const getAllTutorProfiles = async (query: GetTutorsQuery) => {
             totalPages: Math.ceil(total / limit),
         },
         data: formattedTutors,
+    };
+};
+
+const getMyStudents = async (
+    userId: string,
+    query: GetStudentsQuery
+) => {
+    const tutor = await prisma.tutorProfile.findUnique({
+        where: {
+            userId,
+        },
+        select: {
+            id: true,
+        },
+    });
+
+    if (!tutor) {
+        throw new AppError(404, "Tutor profile not found");
+    }
+    const { page, limit, skip, sortBy, sortOrder } = paginationSorting(query);
+
+    const searchTerm = query.searchTerm?.trim();
+
+    const whereCondition: any = {
+        tutorId: tutor.id,
+
+        ...(searchTerm && {
+            student: {
+                user: {
+                    name: {
+                        contains: searchTerm,
+                        mode: "insensitive",
+                    },
+                },
+            },
+        }),
+    };
+
+    const bookings = await prisma.booking.findMany({
+        where: whereCondition,
+
+        include: {
+            student: {
+                include: {
+                    user: true,
+                },
+            },
+            review: true,
+        },
+
+        orderBy: {
+            [sortBy]: sortOrder,
+        },
+    });
+
+    /**
+     * Group bookings by student
+     */
+
+    const studentMap = new Map();
+
+    for (const booking of bookings) {
+        const studentId = booking.student.id;
+
+        if (!studentMap.has(studentId)) {
+            studentMap.set(studentId, {
+                id: booking.student.id,
+
+                user: booking.student.user,
+
+                totalBookings: 0,
+
+                completedBookings: 0,
+
+                cancelledBookings: 0,
+
+                latestBooking: booking.createdAt,
+
+                hasReviewed: false,
+            });
+        }
+
+        const student = studentMap.get(studentId);
+
+        student.totalBookings++;
+
+        if (booking.status === "COMPLETED") {
+            student.completedBookings++;
+        }
+
+        if (booking.status === "CANCELLED") {
+            student.cancelledBookings++;
+        }
+
+        if (booking.review) {
+            student.hasReviewed = true;
+        }
+
+        if (
+            booking.createdAt >
+            student.latestBooking
+        ) {
+            student.latestBooking = booking.createdAt;
+        }
+    }
+
+    const students = [...studentMap.values()];
+
+    students.sort((a, b) =>
+        sortOrder === "asc"
+            ? a.latestBooking.getTime() -
+            b.latestBooking.getTime()
+            : b.latestBooking.getTime() -
+            a.latestBooking.getTime()
+    );
+
+    const total = students.length;
+
+    return {
+        meta: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+        },
+
+        data: students.slice(skip, skip + limit),
     };
 };
 
@@ -211,13 +368,16 @@ const getAvailableDates = async (tutorId: string) => {
     }
 
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const startDate = new Date(today);
-    startDate.setDate(today.getDate() + 2);
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 30);
+    startDate.setDate(startDate.getDate() + 2);
 
-    // 1. Fetch availability
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 30);
+    endDate.setHours(23, 59, 59, 999);
+
+    // 1. Fetch all availabilities of the tutor
     const availabilities = await prisma.availability.findMany({
         where: { tutorId, isActive: true },
     });
@@ -229,7 +389,7 @@ const getAvailableDates = async (tutorId: string) => {
         };
     }
 
-    // 2. Fetch bookings
+    // 2. Fetch all bookings of the tutor for next 30 days 
     const bookings = await prisma.booking.findMany({
         where: {
             tutorId,
@@ -243,8 +403,9 @@ const getAvailableDates = async (tutorId: string) => {
         },
     });
 
-    // 3. Group bookings by date
-    const bookingMap = new Map<string, Set<string>>();
+    // 3. Group bookings by date  // map<date, set<startTimeDate> >
+    // const bookingMap = new Map<string, Set<string>>();
+    const bookingMap = new Map<string, Set<number>>();
 
     for (const b of bookings) {
         const dateKey = b.startTime.toLocaleDateString("en-CA");
@@ -252,11 +413,11 @@ const getAvailableDates = async (tutorId: string) => {
         if (!bookingMap.has(dateKey)) {
             bookingMap.set(dateKey, new Set());
         }
-
-        bookingMap.get(dateKey)!.add(b.startTime.toISOString());
+        // bookingMap.get(dateKey)!.add(b.startTime.toISOString());
+        bookingMap.get(dateKey)!.add(b.startTime.getTime());
     }
 
-    // 4. Group availability by weekday
+    // 4. Group availability by weekday   // map<dayOfWeek, availability>
     const availableDays = new Map<string, typeof availabilities>();
 
     for (const a of availabilities) {
@@ -265,26 +426,25 @@ const getAvailableDates = async (tutorId: string) => {
         }
         availableDays.get(a.dayOfWeek)!.push(a);
     }
-
     const results: any[] = [];
 
-    const totalDays =
-        Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
     // 5. Loop (NO DB CALLS) -----> dates for next 30days
-    for (let i = 0; i <= totalDays; i++) {
-        const date = new Date(startDate);
+    for (let i = 0; i < totalDays; i++) {
+        const date = new Date(startDate);   // full time date with zone
         date.setDate(startDate.getDate() + i);
+        date.setHours(0, 0, 0, 0);
 
-        const dayName = dayMap[date.getDay()];
-        const dateKey = date.toLocaleDateString("en-CA");
+        const dayName = dayMap[date.getDay()];    // dayOfWeek
+        const dateKey = date.toLocaleDateString("en-CA");   // date part only
 
         const dayAvailabilities = availableDays.get(dayName as DayOfWeek);
 
         if (!dayAvailabilities) {
             results.push({
                 date: dateKey,
-                status: "UNAVAILABLE",
+                status: AVAILABILITY_STATUS.UNAVAILABLE,
                 availableSlots: 0,
             });
             continue;
@@ -293,37 +453,36 @@ const getAvailableDates = async (tutorId: string) => {
         let totalSlots = 0;
         let bookedSlots = 0;
 
-        const bookedSet = bookingMap.get(dateKey) || new Set();
+        const bookedSet = bookingMap.get(dateKey) ?? new Set<number>();
 
         for (const avail of dayAvailabilities) {
             const slots = generateTimeSlots(
                 avail.startTime,
                 avail.endTime,
                 avail.slotDuration,
-                new Date(date)
+                new Date(dateKey),
+                // date
             );
-
             totalSlots += slots.length;
 
             for (const slot of slots) {
-                if (bookedSet.has(slot.start.toISOString())) {
+                if (bookedSet.has(slot.start.getTime())) {
                     bookedSlots++;
                 }
             }
         }
-
         const availableSlots = totalSlots - bookedSlots;
 
-        let status: "AVAILABLE" | "PARTIAL" | "FULL" | "UNAVAILABLE";
+        let status: AvailabilityStatus;
 
         if (totalSlots === 0) {
-            status = "UNAVAILABLE";
+            status = AVAILABILITY_STATUS.UNAVAILABLE;
         } else if (availableSlots === 0) {
-            status = "FULL";
+            status = AVAILABILITY_STATUS.FULL;
         } else if (availableSlots === totalSlots) {
-            status = "AVAILABLE";
+            status = AVAILABILITY_STATUS.AVAILABLE;
         } else {
-            status = "PARTIAL";
+            status = AVAILABILITY_STATUS.PARTIAL;
         }
 
         results.push({
@@ -338,6 +497,10 @@ const getAvailableDates = async (tutorId: string) => {
         range: {
             from: startDate.toLocaleDateString("en-CA"),
             to: endDate.toLocaleDateString("en-CA"),
+            // from: startDate.toISOString().split("T")[0],
+            // to: new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+            //     .toISOString()
+            //     .split("T")[0],
         },
         dates: results,
     };
@@ -381,7 +544,6 @@ const getAvailableSlotsForDate = async (
             isActive: true,
         },
     });
-
     if (!availability.length) return [];
 
     // 2. Better date boundary (LOCAL SAFE)
@@ -422,7 +584,6 @@ const getAvailableSlotsForDate = async (
             avail.slotDuration,
             targetDate
         );
-
         for (const slot of slots) {
             const slotTime = slot.start.getTime();
 
@@ -467,9 +628,10 @@ const createTutorProfile = async (payload: CreateTutorPayload, userId: string) =
         const tutorProfile = await tx.tutorProfile.create({
             data: {
                 bio: payload.bio ?? null,
+                education: payload.education.toUpperCase(),
                 experience: payload.experience,
                 hourlyRate: payload.hourlyRate,
-                isFeatured: payload.isFeatured ?? false,
+                // isFeatured: payload.isFeatured ?? false,
                 user: {
                     connect: { id: userId },
                 },
@@ -500,6 +662,14 @@ const createTutorProfile = async (payload: CreateTutorPayload, userId: string) =
                     categoryId,
                 })),
                 skipDuplicates: true,
+            });
+
+            // marking profile creation as complete
+            await tx.user.update({
+                where: { id: userId },
+                data: {
+                    profileCompleted: true,
+                },
             });
         }
         return tutorProfile;
@@ -539,9 +709,10 @@ const updateTutorProfile = async (
         const updateData = Object.fromEntries(
             Object.entries({
                 bio: payload.bio,
+                education: payload.education?.toUpperCase(),
                 experience: payload.experience,
                 hourlyRate: payload.hourlyRate,
-                isFeatured: payload.isFeatured,
+                // isFeatured: payload.isFeatured,
             }).filter(([_, value]) => value !== undefined)
         );
 
@@ -626,6 +797,7 @@ const deleteTutorProfile = async (tutorId: string, userId: string) => {
 
 export const TutorService = {
     getAllTutorProfiles,
+    getMyStudents,
     getMyTutorProfile,
     getTutorProfileById,
     getAvailableDates,
