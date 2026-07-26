@@ -9,11 +9,15 @@ model User {
     sessions      Session[]
     accounts      Account[]
 
-    role   Role   @default(STUDENT)
-    status Status @default(ACTIVE)
+    role             Role?
+    status           Status  @default(ACTIVE)
+    profileCompleted Boolean @default(false)
 
     tutorProfile   TutorProfile?
     studentProfile StudentProfile?
+
+    conversationParticipants ConversationParticipant[]
+    sentMessages             Message[]
 
     @@unique([email])
     @@map("user")
