@@ -6092,9 +6092,196 @@ var UserRoutes = router8;
 import { Router as Router9 } from "express";
 
 // src/socket/socket.ts
+import { createServer } from "http";
 import { Server } from "socket.io";
+
+// src/socket/middleware/socketAuth.ts
+var socketAuth = async (socket, next) => {
+  try {
+    const session = await auth.api.getSession({
+      headers: socket.handshake.headers
+    });
+    console.log(socket.handshake.headers);
+    if (!session) {
+      return next(new AppError(401, "Unauthorized"));
+    }
+    if (!session.user.emailVerified) {
+      return next(
+        new AppError(
+          403,
+          "Please verify your email."
+        )
+      );
+    }
+    if (session.user.status === Status.BLOCKED) {
+      return next(
+        new AppError(
+          403,
+          "Account blocked."
+        )
+      );
+    }
+    socket.data.user = {
+      id: session.user.id,
+      name: session.user.name,
+      email: session.user.email,
+      image: session.user.image,
+      emailVerified: session.user.emailVerified,
+      role: session.user.role,
+      status: session.user.status,
+      profileCompleted: session.user.profileCompleted
+    };
+    next();
+  } catch (error) {
+    next(new AppError(401, "Unauthorized"));
+  }
+};
+
+// src/socket/socket.events.ts
+var SOCKET_EVENTS = {
+  CONNECTION: "connection",
+  DISCONNECT: "disconnect",
+  MESSAGE_NEW: "message:new",
+  MESSAGE_READ: "message:read",
+  CONVERSATION_UPDATED: "conversation:updated",
+  TYPING_START: "typing:start",
+  TYPING_STOP: "typing:stop",
+  CONVERSATION_JOIN: "conversation:join",
+  CONVERSATION_LEAVE: "conversation:leave",
+  USER_ONLINE: "user:online",
+  USER_OFFLINE: "user:offline",
+  PRESENCE_INIT: "presence:init"
+};
+var registerSocketEvents = (io2, socket) => {
+  console.log("Connected:", socket.data.user.id);
+  socket.on(
+    SOCKET_EVENTS.CONVERSATION_JOIN,
+    (conversationId) => {
+      socket.join(conversationId);
+      console.log(
+        `${socket.data.user.id} joined ${conversationId}`
+      );
+    }
+  );
+  socket.on(
+    SOCKET_EVENTS.CONVERSATION_LEAVE,
+    (conversationId) => {
+      socket.leave(conversationId);
+      console.log(
+        `${socket.data.user.id} left ${conversationId}`
+      );
+    }
+  );
+  socket.on(
+    SOCKET_EVENTS.TYPING_START,
+    (conversationId) => {
+      socket.to(conversationId).emit(
+        SOCKET_EVENTS.TYPING_START,
+        {
+          conversationId,
+          userId: socket.data.user.id
+        }
+      );
+    }
+  );
+  socket.on(
+    SOCKET_EVENTS.TYPING_STOP,
+    (conversationId) => {
+      socket.to(conversationId).emit(
+        SOCKET_EVENTS.TYPING_STOP,
+        {
+          conversationId,
+          userId: socket.data.user.id
+        }
+      );
+    }
+  );
+  socket.on(SOCKET_EVENTS.DISCONNECT, () => {
+    console.log(
+      `${socket.data.user.id} disconnected`
+    );
+  });
+};
+
+// src/socket/presence.ts
+var onlineUsers = /* @__PURE__ */ new Map();
+var Presence = {
+  add(userId, socketId) {
+    if (!onlineUsers.has(userId)) {
+      onlineUsers.set(userId, /* @__PURE__ */ new Set());
+    }
+    onlineUsers.get(userId).add(socketId);
+  },
+  remove(userId, socketId) {
+    const sockets = onlineUsers.get(userId);
+    if (!sockets) return;
+    sockets.delete(socketId);
+    if (sockets.size === 0) {
+      onlineUsers.delete(userId);
+    }
+  },
+  isOnline(userId) {
+    return onlineUsers.has(userId);
+  },
+  getOnlineUsers() {
+    return [...onlineUsers.keys()];
+  },
+  count() {
+    return onlineUsers.size;
+  }
+};
+
+// src/socket/socket.ts
 var FRONTEND_URL = env.APP_URL;
 var io;
+var initializeSocket = (httpServer) => {
+  io = new Server(httpServer, {
+    cors: {
+      origin: FRONTEND_URL,
+      credentials: true
+    }
+  });
+  io.use(socketAuth);
+  io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
+    console.log(`\u{1F7E2} Socket connected: ${socket.id}`);
+    console.log({
+      socket: socket.id,
+      user: socket.data.user
+    });
+    const userId = socket.data.user.id;
+    Presence.add(userId, socket.id);
+    socket.join(userId);
+    socket.emit(
+      SOCKET_EVENTS.PRESENCE_INIT,
+      Presence.getOnlineUsers()
+    );
+    console.log(
+      `${userId} joined personal room`
+    );
+    socket.broadcast.emit(
+      SOCKET_EVENTS.USER_ONLINE,
+      {
+        userId
+      }
+    );
+    registerSocketEvents(io, socket);
+    socket.on(SOCKET_EVENTS.DISCONNECT, () => {
+      const userId2 = socket.data.user.id;
+      Presence.remove(userId2, socket.id);
+      if (!Presence.isOnline(userId2)) {
+        socket.broadcast.emit(
+          SOCKET_EVENTS.USER_OFFLINE,
+          {
+            userId: userId2
+          }
+        );
+      }
+      console.log(`\u{1F534} ${userId2} disconnected`);
+      console.log(`\u{1F534} Socket disconnected: ${socket.id}`);
+    });
+  });
+  return io;
+};
 var getIO = () => {
   if (!io) {
     throw new Error(
@@ -7077,11 +7264,35 @@ app.use(notFound);
 app.use(globalErrorHandler);
 var app_default = app;
 
-// src/index.ts
-var index_default = app_default;
-export {
-  index_default as default
-};
+// src/server.ts
+var port = Number(env.PORT);
+async function main() {
+  try {
+    await prisma.$connect();
+    console.log("Connected to the database successfully.");
+    const httpServer = createServer(app_default);
+    initializeSocket(httpServer);
+    httpServer.listen(port, () => {
+      console.log(
+        `Server is running on http://localhost:${port}`
+      );
+    });
+  } catch (error) {
+    console.error("Startup error:", error);
+    process.exit(1);
+  }
+}
+main();
+process.on("SIGINT", async () => {
+  console.log("Shutting down...");
+  await prisma.$disconnect();
+  process.exit(0);
+});
+process.on("SIGTERM", async () => {
+  console.log("Shutting down...");
+  await prisma.$disconnect();
+  process.exit(0);
+});
 /*! Bundled license information:
 
 object-assign/index.js:
