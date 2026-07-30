@@ -11,9 +11,6 @@ import { AVAILABILITY_STATUS, AvailabilityStatus } from "../../constants/availab
 
 
 const getAllTutorProfiles = async (query: GetTutorsQuery) => {
-
-    console.log("REQ QUERY:", query);
-
     // 1. Convert query params safely
     const minRating = convertStrToNum(query.minRating, "minRating");
     const minPrice = convertStrToNum(query.minPrice, "minPrice");
@@ -326,7 +323,21 @@ const getTutorProfileById = async (tutorId: string) => {
         include: {
             user: true,
             bookingsAsTutor: true,
-            tutorReviews: true,
+            tutorReviews: {
+                include: {
+                    student: {
+                        select: {
+                            user: {
+                                select: {
+                                    name: true,
+                                    image: true
+                                }
+                            }
+                        }
+                    }
+                }
+
+            },
             availability: true,
             categories: {
                 include: {
