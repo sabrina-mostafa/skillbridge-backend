@@ -390,5 +390,5 @@ This project is licensed under the MIT License.
 
 **Sabrina Mostafa**
 
-- GitHub: https://github.com/your-github
+- GitHub: [sabrina-mostafa](https://github.com/sabrina-mostafa)
 - LinkedIn: [Sabrina Mostafa](https://www.linkedin.com/in/sabrina-mostafa-389114207/)
