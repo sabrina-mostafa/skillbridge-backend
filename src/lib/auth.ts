@@ -399,8 +399,8 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url, token, }, request) => {
       try {
-        console.log("******************* email sent")
-        console.log({ user, url, token });
+        // console.log("******************* email sent")
+        // console.log({ user, url, token });
 
         // const verificationUrl = `${env.BETTER_AUTH_URL}/api/auth/verify-email?token=${token}`
         // console.log("verificationUrl", verificationUrl);
@@ -419,11 +419,11 @@ export const auth = betterAuth({
           html: emailVerificationTemplate(user, verificationUrl.toString()), // HTML body
         });
 
-        console.log("Message sent: %s", info.messageId);
+        // console.log("Message sent: %s", info.messageId);
         // Preview URL is only available when using an Ethereal test account
-        console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+        // console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
       } catch (err) {
-        console.error("Error while sending mail:", err);
+        // console.error("Error while sending mail:", err);
         throw err;
       }
     },
